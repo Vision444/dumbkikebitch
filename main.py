@@ -683,6 +683,13 @@ def main():
         print("Error: DISCORD_TOKEN not set!")
         sys.exit(1)
 
+    # Debug token
+    token_len = len(DISCORD_TOKEN)
+    masked_token = f"{DISCORD_TOKEN[:5]}...{DISCORD_TOKEN[-5:]}" if token_len > 10 else "TOO_SHORT"
+    print(f"DEBUG: Token length: {token_len}")
+    print(f"DEBUG: Token starts/ends: {masked_token}")
+    print(f"DEBUG: Token has whitespace: {any(c.isspace() for c in DISCORD_TOKEN)}")
+    
     try:
         # Start health check server for Railway
         start_health_server()
