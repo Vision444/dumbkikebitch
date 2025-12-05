@@ -22,6 +22,9 @@ class DatabaseManager:
     async def initialize(self):
         """Initialize the database connection pool and create tables"""
         try:
+            logger.info(
+                f"Attempting to connect to database: {self.database_url.replace(self.database_url.split('@')[0].split(':')[1], '***') if '@' in self.database_url else 'URL set'}"
+            )
             self.pool = await asyncpg.create_pool(
                 self.database_url,
                 min_size=2,
@@ -36,6 +39,7 @@ class DatabaseManager:
 
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
+            logger.error(f"Database URL used: {self.database_url}")
             raise
 
     async def create_tables(self):
