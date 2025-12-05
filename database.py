@@ -13,7 +13,8 @@ class DatabaseManager:
         self.database_url = os.getenv("DATABASE_URL")
         if not self.database_url:
             # Build from individual components if DATABASE_URL not provided
-            host = os.getenv("DB_HOST", "postgres-production-8950.up.railway.app")
+            # Use Railway internal host for better performance and security
+            host = os.getenv("DB_HOST", "postgres.railway.internal")
             user = os.getenv("DB_USER", "postgres")
             password = os.getenv("DB_PASSWORD", "xyLqkqZvMQubrvDkBoffAzxRuMaPwCHv")
             database = os.getenv("DB_NAME", "railway")
