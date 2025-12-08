@@ -231,34 +231,10 @@ class PasswordCommandHandler:
         )
 
     async def handle_help_command(self, message):
-        """Handle !help command"""
-        embed = discord.Embed(
-            title="🔐 Password Manager Help",
-            description="Secure password management commands",
-            color=discord.Color.blue(),
+        """Handle !help command - redirect to unified help"""
+        await message.author.send(
+            "📋 **Unified Help**\n\nPlease use `/help` to see the complete command reference for both Audio Downloader and Password Manager features.\n\nThe unified help includes:\n• All audio downloader commands\n• All password manager commands\n• Security features and usage examples\n• Interactive pagination for easy navigation"
         )
-
-        embed.add_field(
-            name="Commands",
-            value="`!new [service]` - Create new password\n"
-            "`!get <service>` - Retrieve password\n"
-            "`!list` - List all services\n"
-            "`!update <service>` - Update password\n"
-            "`!delete <service>` - Delete password\n"
-            "`!help` - Show this help",
-            inline=False,
-        )
-
-        embed.add_field(
-            name="Security Features",
-            value="• All passwords encrypted with Fernet\n"
-            "• Credentials sent via DM only\n"
-            "• Auto-deletion of password messages\n"
-            "• 120-second timeout for operations",
-            inline=False,
-        )
-
-        await message.author.send(embed=embed)
 
     async def handle_state_response(self, message):
         """Handle responses in multi-step command flows"""

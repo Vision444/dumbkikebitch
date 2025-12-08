@@ -5,13 +5,14 @@ A comprehensive Discord bot that combines audio downloading from YouTube/SoundCl
 ## Features
 
 ### 🎵 Audio Downloader
-- Download audio from YouTube and SoundCloud
+- Download audio from YouTube, SoundCloud, and Twitter/X
 - Interactive 6-step DM workflow for metadata collection
 - Custom metadata (artist, title, album, filename)
 - Album art embedding from URLs or attachments
 - Auto-detection of metadata from video info
 - File size handling for Discord limits (25MB)
 - Download tracking in database
+- Twitter/X video audio extraction
 
 ### 🔐 Password Manager
 - Secure password storage with Fernet encryption
@@ -82,6 +83,7 @@ python main.py
 - `/download` - Start interactive audio download process
 - `/help` - Show available commands
 - `/cancel` - Show cancellation instructions
+- Supports: YouTube, SoundCloud, Twitter/X URLs
 
 ### Password Manager (Prefix Commands)
 - `!new [service]` - Create new password (with or without service name)
@@ -155,10 +157,11 @@ CREATE TABLE audio_downloads (
 - **Error Handling**: No sensitive data logged or exposed
 
 ### Audio Downloader
-- **URL Validation**: Only accepts YouTube and SoundCloud URLs
+- **URL Validation**: Accepts YouTube, SoundCloud, and Twitter/X URLs
 - **File Sanitization**: Safe filename generation for all operating systems
 - **Size Limits**: Handles Discord's 25MB file upload limit
 - **Metadata Sanitization**: All metadata properly validated
+- **Twitter/X Support**: Extracts audio from Twitter/X video posts
 
 ## Development
 
@@ -203,7 +206,7 @@ Monitor Railway logs or local console for detailed error information and debuggi
 - **discord.py** 2.3+ - Discord API wrapper
 - **asyncpg** 0.28+ - Async PostgreSQL driver
 - **cryptography** 41.0+ - Fernet encryption
-- **yt-dlp** 2023.0+ - YouTube/SoundCloud downloader
+- **yt-dlp** 2023.0+ - YouTube/SoundCloud/Twitter downloader
 - **mutagen** 1.46.0+ - Audio metadata handling
 - **requests** 2.31.0+ - HTTP client
 - **aiohttp** 3.8.0+ - Async HTTP client

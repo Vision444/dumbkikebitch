@@ -1,4 +1,4 @@
-import asyncpg 
+import asyncpg
 import asyncio
 import os
 import logging
@@ -169,6 +169,10 @@ class DatabaseManager:
         filename: str = None,
         file_size: int = None,
         status: str = None,
+        url: str = None,
+        title: str = None,
+        artist: str = None,
+        album: str = None,
     ):
         """Update audio download status and metadata"""
         updates = []
@@ -188,6 +192,26 @@ class DatabaseManager:
         if status is not None:
             updates.append(f"download_status = ${param_count}")
             params.append(status)
+            param_count += 1
+
+        if url is not None:
+            updates.append(f"url = ${param_count}")
+            params.append(url)
+            param_count += 1
+
+        if title is not None:
+            updates.append(f"title = ${param_count}")
+            params.append(title)
+            param_count += 1
+
+        if artist is not None:
+            updates.append(f"artist = ${param_count}")
+            params.append(artist)
+            param_count += 1
+
+        if album is not None:
+            updates.append(f"album = ${param_count}")
+            params.append(album)
             param_count += 1
 
         if status == "completed":

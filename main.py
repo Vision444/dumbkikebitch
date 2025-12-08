@@ -83,11 +83,17 @@ async def get_image_from_attachment(attachment: discord.Attachment) -> Optional[
 
 
 def validate_url(url: str) -> bool:
-    """Validate YouTube/SoundCloud URL."""
+    """Validate YouTube/SoundCloud/Twitter URL."""
     url_lower = url.lower()
     return any(
         pattern in url_lower
-        for pattern in ["youtube.com/watch", "youtu.be/", "soundcloud.com"]
+        for pattern in [
+            "youtube.com/watch",
+            "youtu.be/",
+            "soundcloud.com",
+            "x.com/",
+            "twitter.com/",
+        ]
     )
 
 
@@ -523,6 +529,8 @@ async def download_command(interaction: discord.Interaction):
 
                 if "soundcloud.com" in url.lower():
                     detected = AudioMetadata.from_soundcloud_info(info)
+                elif "x.com/" in url.lower() or "twitter.com/" in url.lower():
+                    detected = AudioMetadata.from_twitter_info(info)
                 else:
                     detected = AudioMetadata.from_youtube_info(info)
 
@@ -627,42 +635,146 @@ async def download_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="help", description="Show available commands")
 async def help_command(interaction: discord.Interaction):
-    """Show help information."""
+    """Show unified help information with pagination."""
 
-    embed = discord.Embed(
-        title="🤖 AIO Discord Bot",
+    # Page 1: Overview and Audio Commands
+    page1 = discord.Embed(
+        title="🤖 QNX Discord Bot - Help (1/3)",
         description="All-in-one Discord bot with audio downloader and password manager",
         color=discord.Color.blue(),
     )
 
-    embed.add_field(
-        name="🎵 Audio Downloader",
-        value="/download - Start interactive audio download\n"
-        "Supports YouTube and SoundCloud\n"
-        "Custom metadata and album art",
+    page1.add_field(
+        name="🎵 Audio Downloader Commands",
+        value="`/download` - Start interactive audio download\n"
+        "`/cancel` - Show cancellation instructions\n"
+        "Supports YouTube, SoundCloud, and Twitter/X\n"
+        "Custom metadata and album art embedding",
         inline=False,
     )
 
-    embed.add_field(
-        name="🔐 Password Manager",
-        value="!new [service] - Create new password\n"
-        "!get <service> - Retrieve password\n"
-        "!list - Show all services\n"
-        "!update <service> - Update password\n"
-        "!delete <service> - Delete password\n"
-        "!help - Show password help",
+    page1.add_field(
+        name="🔐 Password Manager Commands",
+        value="`!new [service]` - Create new password\n"
+        "`!get <service>` - Retrieve password via DM\n"
+        "`!list` - Show all stored services\n"
+        "`!update <service>` - Update existing password\n"
+        "`!delete <service>` - Delete password with confirmation",
         inline=False,
     )
 
-    embed.add_field(
-        name="🔒 Security",
-        value="• All passwords encrypted with Fernet\n"
+    page1.set_footer(text="Use the buttons below to navigate through help pages")
+
+    # Page 2: Password Manager Details
+    page2 = discord.Embed(
+        title="🔐 Password Manager Details (2/3)",
+        description="Secure password storage and management",
+        color=discord.Color.green(),
+    )
+
+    page2.add_field(
+        name="🛡️ Security Features",
+        value="• All passwords encrypted with Fernet (AES-128 + HMAC-SHA256)\n"
         "• Credentials sent via DM only\n"
-        "• Auto-deletion of sensitive messages",
+        "• Auto-deletion of password messages after 60 seconds\n"
+        "• 120-second timeout for all operations\n"
+        "• Complete audit trail with timestamps",
         inline=False,
     )
 
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    page2.add_field(
+        name="💡 Usage Examples",
+        value="`!new Gmail` - Quick create with service name\n"
+        "`!new` - Interactive creation flow\n"
+        "`!get Netflix` - Retrieve Netflix password\n"
+        "`!list` - Show all stored services\n"
+        "`!update Gmail` - Update Gmail password",
+        inline=False,
+    )
+
+    page2.set_footer(text="Use the buttons below to navigate through help pages")
+
+    # Page 3: Audio Downloader Details
+    page3 = discord.Embed(
+        title="🎵 Audio Downloader Details (3/3)",
+        description="Download and process audio from YouTube and SoundCloud",
+        color=discord.Color.purple(),
+    )
+
+    page3.add_field(
+        name="📥 Download Process",
+        value="1. Use `/download` to start\n"
+        "2. Provide YouTube, SoundCloud, or Twitter/X URL\n"
+        "3. Enter custom metadata (artist, title, album)\n"
+        "4. Choose filename or auto-generate\n"
+        "5. Optionally add album cover (URL or attachment)\n"
+        "6. Receive processed MP3 file via DM",
+        inline=False,
+    )
+
+    page3.add_field(
+        name="⚙️ Features",
+        value="• Automatic metadata detection from video info\n"
+        "• Custom album art embedding\n"
+        "• File size handling for Discord 25MB limit\n"
+        "• Safe filename generation\n"
+        "• Download tracking and history\n"
+        "• Twitter/X video audio extraction",
+        inline=False,
+    )
+
+    page3.add_field(
+        name="🚨 Important Notes",
+        value="• All interactions happen via DM for privacy\n"
+        "• Downloads timeout after 5 minutes\n"
+        "• Type 'cancel' at any prompt to abort\n"
+        "• Large files (>25MB) saved locally with path provided",
+        inline=False,
+    )
+
+    page3.set_footer(text="Use the buttons below to navigate through help pages")
+
+    # Create pagination view
+    class HelpView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=180)  # 3 minutes timeout
+            self.current_page = 0
+            self.pages = [page1, page2, page3]
+
+        @discord.ui.button(
+            label="◀", style=discord.ButtonStyle.secondary, custom_id="prev"
+        )
+        async def previous_page(
+            self, interaction: discord.Interaction, button: discord.ui.Button
+        ):
+            self.current_page = (self.current_page - 1) % len(self.pages)
+            await interaction.response.edit_message(
+                embed=self.pages[self.current_page], view=self
+            )
+
+        @discord.ui.button(
+            label="▶", style=discord.ButtonStyle.secondary, custom_id="next"
+        )
+        async def next_page(
+            self, interaction: discord.Interaction, button: discord.ui.Button
+        ):
+            self.current_page = (self.current_page + 1) % len(self.pages)
+            await interaction.response.edit_message(
+                embed=self.pages[self.current_page], view=self
+            )
+
+        @discord.ui.button(
+            label="🗑️", style=discord.ButtonStyle.danger, custom_id="delete"
+        )
+        async def delete_message(
+            self, interaction: discord.Interaction, button: discord.ui.Button
+        ):
+            await interaction.response.edit_message(view=None)
+            await asyncio.sleep(2)
+            await interaction.delete_original_response()
+
+    view = HelpView()
+    await interaction.response.send_message(embed=page1, view=view, ephemeral=True)
 
 
 @bot.tree.command(name="cancel", description="Cancel current download process")
@@ -685,11 +797,13 @@ def main():
 
     # Debug token
     token_len = len(DISCORD_TOKEN)
-    masked_token = f"{DISCORD_TOKEN[:5]}...{DISCORD_TOKEN[-5:]}" if token_len > 10 else "TOO_SHORT"
+    masked_token = (
+        f"{DISCORD_TOKEN[:5]}...{DISCORD_TOKEN[-5:]}" if token_len > 10 else "TOO_SHORT"
+    )
     print(f"DEBUG: Token length: {token_len}")
     print(f"DEBUG: Token starts/ends: {masked_token}")
     print(f"DEBUG: Token has whitespace: {any(c.isspace() for c in DISCORD_TOKEN)}")
-    
+
     try:
         # Start health check server for Railway
         start_health_server()

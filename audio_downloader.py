@@ -67,6 +67,15 @@ class AudioMetadata:
             album=None,
         )
 
+    @classmethod
+    def from_twitter_info(cls, info):
+        """Create metadata from Twitter/X video info."""
+        return cls(
+            artist=info.get("author_name", "Twitter/X User"),
+            title=info.get("title", "Twitter/X Audio"),
+            album="Twitter/X",
+        )
+
 
 class AudioDownloader:
     """Main class for downloading and processing audio."""
@@ -131,6 +140,10 @@ class AudioDownloader:
         }
 
         try:
+            # Special handling for Twitter/X URLs
+            if "x.com/" in url.lower() or "twitter.com/" in url.lower():
+                return self._download_twitter_audio(url, metadata, quality)
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
 
@@ -190,10 +203,133 @@ class AudioDownloader:
         except Exception as e:
             self.logger.warning(f"Failed to apply metadata: {e}")
 
+    def _download_twitter_audio(
+        self, url: str, metadata: AudioMetadata = None, quality: str = None
+    ) -> Path:
+        """Download audio from Twitter/X URL."""
+        if metadata is None:
+            metadata = AudioMetadata()
+
+        # Configure yt-dlp for Twitter/X
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+            "outtmpl": os.path.join(
+                self.config.output_directory, "twitter_audio_%(id)s.%(ext)s"
+            ),
+            "ffmpeg_location": self.config.ffmpeg_path,
+            "quiet": not self.verbose,
+            "no_warnings": not self.verbose,
+            "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
+            "extract_flat": False,  # Need full extraction for Twitter
+        }
+
+        try:
+            self.logger.info(f"Attempting to download Twitter/X audio from: {url}")
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+
+                # Get the downloaded file path
+                filename = ydl.prepare_filename(info)
+                # yt-dlp may have changed the extension to .mp3
+                if filename.endswith(".webm") or filename.endswith(".m4a"):
+                    filename = Path(filename).with_suffix(".mp3")
+
+                output_file = Path(filename)
+
+                # Auto-detect metadata if empty
+                if metadata.is_empty():
+                    metadata = AudioMetadata.from_twitter_info(info)
+
+                # Apply metadata
+                self._apply_metadata(output_file, metadata)
+
+                self.logger.info(
+                    f"Twitter/X audio downloaded successfully: {output_file}"
+                )
+                return output_file
+
+        except Exception as e:
+            self.logger.error(f"Twitter/X download failed: {e}")
+            # Try alternative approach - extract tweet ID and use different method
+            try:
+                return self._download_twitter_alternative(url, metadata)
+            except Exception as alt_e:
+                self.logger.error(
+                    f"Alternative Twitter/X download also failed: {alt_e}"
+                )
+                raise Exception(f"Twitter/X download failed: {e}")
+
+    def _download_twitter_alternative(
+        self, url: str, metadata: AudioMetadata = None
+    ) -> Path:
+        """Alternative method for Twitter/X download using different approach."""
+        import re
+
+        # Extract tweet ID from URL
+        tweet_id_match = re.search(r"/status/(\d+)", url)
+        if not tweet_id_match:
+            raise ValueError("Could not extract tweet ID from URL")
+
+        tweet_id = tweet_id_match.group(1)
+        self.logger.info(f"Extracted tweet ID: {tweet_id}")
+
+        # Try to get video info using alternative approach
+        # This is a fallback method - in practice, yt-dlp should handle most cases
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ],
+            "outtmpl": os.path.join(
+                self.config.output_directory, f"twitter_{tweet_id}.%(ext)s"
+            ),
+            "ffmpeg_location": self.config.ffmpeg_path,
+            "quiet": not self.verbose,
+            "no_warnings": not self.verbose,
+        }
+
+        # Try with direct video URL construction
+        video_url = f"https://twitter.com/i/videos/tweet/{tweet_id}"
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=True)
+
+            filename = ydl.prepare_filename(info)
+            if filename.endswith(".webm") or filename.endswith(".m4a"):
+                filename = Path(filename).with_suffix(".mp3")
+
+            output_file = Path(filename)
+
+            # Apply metadata
+            if metadata.is_empty():
+                metadata = AudioMetadata.from_twitter_info(info)
+
+            self._apply_metadata(output_file, metadata)
+
+            return output_file
+
     def validate_url(self, url: str) -> bool:
-        """Validate YouTube/SoundCloud URL."""
+        """Validate YouTube/SoundCloud/Twitter URL."""
         url_lower = url.lower()
         return any(
             pattern in url_lower
-            for pattern in ["youtube.com/watch", "youtu.be/", "soundcloud.com"]
+            for pattern in [
+                "youtube.com/watch",
+                "youtu.be/",
+                "soundcloud.com",
+                "x.com/",
+                "twitter.com/",
+            ]
         )
