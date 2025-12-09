@@ -70,6 +70,7 @@ class DatabaseManager:
             file_size BIGINT,
             download_status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP
         );
         
@@ -79,6 +80,18 @@ class DatabaseManager:
 
         async with self.pool.acquire() as conn:
             await conn.execute(create_tables_query)
+
+            # Add updated_at column if it doesn't exist (for existing installations)
+            try:
+                await conn.execute(
+                    "ALTER TABLE audio_downloads ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                )
+                logger.info("Added updated_at column to audio_downloads table")
+            except Exception as e:
+                logger.warning(
+                    f"Could not add updated_at column (may already exist): {e}"
+                )
+
             logger.info("Database tables created/verified successfully")
 
     # Password management methods
