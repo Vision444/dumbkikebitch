@@ -140,6 +140,7 @@ CREATE TABLE audio_downloads (
 ### 2. Railway Configuration Files
 - **Procfile**: Tells Railway how to run your bot
 - **railway.json**: Deployment configuration with health checks
+- **nixpacks.toml**: Railway build configuration (includes ffmpeg for audio processing)
 - **requirements.txt**: Python dependencies
 
 ### 3. Health Checks

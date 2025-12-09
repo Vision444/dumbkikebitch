@@ -21,9 +21,42 @@ class AudioConfig:
     def __init__(self):
         self.output_directory = os.getenv("OUTPUT_DIRECTORY", "./downloads")
         self.audio_quality = os.getenv("AUDIO_QUALITY", "best")
-        self.ffmpeg_path = os.getenv("FFMPEG_PATH", "ffmpeg")
+        self.ffmpeg_path = self._find_ffmpeg()
         self.default_artist = os.getenv("DEFAULT_ARTIST", "")
         self.default_album = os.getenv("DEFAULT_ALBUM", "")
+
+    def _find_ffmpeg(self) -> str:
+        """Find ffmpeg executable, checking common Railway paths."""
+        # Check environment variable first
+        ffmpeg_path = os.getenv("FFMPEG_PATH")
+        if ffmpeg_path and self._check_ffmpeg_path(ffmpeg_path):
+            return ffmpeg_path
+
+        # Common Railway/Linux paths
+        common_paths = [
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/bin/ffmpeg",
+            "/opt/ffmpeg/bin/ffmpeg",
+            "ffmpeg",  # Hope it's in PATH
+        ]
+
+        for path in common_paths:
+            if self._check_ffmpeg_path(path):
+                return path
+
+        # If nothing found, return default and let yt-dlp handle it
+        return "ffmpeg"
+
+    def _check_ffmpeg_path(self, path: str) -> bool:
+        """Check if ffmpeg exists at the given path."""
+        try:
+            result = subprocess.run(
+                [path, "-version"], capture_output=True, text=True, timeout=5
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            return False
 
     def ensure_output_directory(self):
         """Create output directory if it doesn't exist."""
@@ -133,11 +166,14 @@ class AudioDownloader:
                 }
             ],
             "outtmpl": os.path.join(self.config.output_directory, "%(title)s.%(ext)s"),
-            "ffmpeg_location": self.config.ffmpeg_path,
             "quiet": not self.verbose,
             "no_warnings": not self.verbose,
             "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
         }
+
+        # Only set ffmpeg_location if we found a valid path
+        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
+            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
 
         try:
             # Special handling for Twitter/X URLs
@@ -223,12 +259,15 @@ class AudioDownloader:
             "outtmpl": os.path.join(
                 self.config.output_directory, "twitter_audio_%(id)s.%(ext)s"
             ),
-            "ffmpeg_location": self.config.ffmpeg_path,
             "quiet": not self.verbose,
             "no_warnings": not self.verbose,
             "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
             "extract_flat": False,  # Need full extraction for Twitter
         }
+
+        # Only set ffmpeg_location if we found a valid path
+        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
+            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
 
         try:
             self.logger.info(f"Attempting to download Twitter/X audio from: {url}")
@@ -295,10 +334,13 @@ class AudioDownloader:
             "outtmpl": os.path.join(
                 self.config.output_directory, f"twitter_{tweet_id}.%(ext)s"
             ),
-            "ffmpeg_location": self.config.ffmpeg_path,
             "quiet": not self.verbose,
             "no_warnings": not self.verbose,
         }
+
+        # Only set ffmpeg_location if we found a valid path
+        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
+            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
 
         # Try with direct video URL construction
         video_url = f"https://twitter.com/i/videos/tweet/{tweet_id}"
