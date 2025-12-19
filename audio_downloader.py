@@ -140,6 +140,56 @@ class AudioDownloader:
 
         return mp3_path
 
+    def _get_ydl_options(
+        self,
+        output_template: str,
+        quality: str,
+        include_twitter_extras: bool = False,
+    ) -> dict:
+        quality_normalized = (quality or self.config.audio_quality or "best").lower()
+        if quality_normalized not in {"best", "good", "worst"}:
+            quality_normalized = "best"
+
+        preferred_quality_map = {
+            "best": "192",
+            "good": "128",
+            "worst": "96",
+        }
+        format_map = {
+            "best": "bestaudio/best",
+            "good": "bestaudio[abr<=128]/bestaudio/best",
+            "worst": "bestaudio[abr<=96]/bestaudio/best",
+        }
+
+        ydl_opts = {
+            "format": format_map[quality_normalized],
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": preferred_quality_map[quality_normalized],
+                }
+            ],
+            "outtmpl": output_template,
+            "quiet": not self.verbose,
+            "no_warnings": not self.verbose,
+            "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
+            "noplaylist": True,
+            "concurrent_fragment_downloads": 4,
+            "fragment_retries": 1,
+            "retries": 1,
+            "socket_timeout": 30,
+            "http_chunk_size": 10485760,
+        }
+
+        if include_twitter_extras:
+            ydl_opts["extract_flat"] = False
+
+        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
+            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
+
+        return ydl_opts
+
     def _yt_progress_hook(self, progress_dict):
         """yt-dlp progress hook for detailed logging without spamming."""
         status = progress_dict.get("status")
@@ -173,26 +223,11 @@ class AudioDownloader:
             metadata = AudioMetadata()
 
         quality = quality or self.config.audio_quality
-
-        # Configure yt-dlp options
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ],
-            "outtmpl": os.path.join(self.config.output_directory, "%(title)s.%(ext)s"),
-            "quiet": not self.verbose,
-            "no_warnings": not self.verbose,
-            "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
-        }
-
-        # Only set ffmpeg_location if we found a valid path
-        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
-            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
+        ydl_opts = self._get_ydl_options(
+            os.path.join(self.config.output_directory, "%(title)s.%(ext)s"),
+            quality=quality,
+            include_twitter_extras=False,
+        )
 
         try:
             # Special handling for Twitter/X URLs
@@ -265,28 +300,12 @@ class AudioDownloader:
         if metadata is None:
             metadata = AudioMetadata()
 
-        # Configure yt-dlp for Twitter/X
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ],
-            "outtmpl": os.path.join(
-                self.config.output_directory, "twitter_audio_%(id)s.%(ext)s"
-            ),
-            "quiet": not self.verbose,
-            "no_warnings": not self.verbose,
-            "progress_hooks": [self._yt_progress_hook] if self.verbose else [],
-            "extract_flat": False,  # Need full extraction for Twitter
-        }
-
-        # Only set ffmpeg_location if we found a valid path
-        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
-            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
+        quality = quality or self.config.audio_quality
+        ydl_opts = self._get_ydl_options(
+            os.path.join(self.config.output_directory, "twitter_audio_%(id)s.%(ext)s"),
+            quality=quality,
+            include_twitter_extras=True,
+        )
 
         try:
             self.logger.info(f"Attempting to download Twitter/X audio from: {url}")
@@ -341,25 +360,11 @@ class AudioDownloader:
 
         # Try to get video info using alternative approach
         # This is a fallback method - in practice, yt-dlp should handle most cases
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ],
-            "outtmpl": os.path.join(
-                self.config.output_directory, f"twitter_{tweet_id}.%(ext)s"
-            ),
-            "quiet": not self.verbose,
-            "no_warnings": not self.verbose,
-        }
-
-        # Only set ffmpeg_location if we found a valid path
-        if self.config.ffmpeg_path and self.config.ffmpeg_path != "ffmpeg":
-            ydl_opts["ffmpeg_location"] = self.config.ffmpeg_path
+        ydl_opts = self._get_ydl_options(
+            os.path.join(self.config.output_directory, f"twitter_{tweet_id}.%(ext)s"),
+            quality=self.config.audio_quality,
+            include_twitter_extras=False,
+        )
 
         # Try with direct video URL construction
         video_url = f"https://twitter.com/i/videos/tweet/{tweet_id}"
