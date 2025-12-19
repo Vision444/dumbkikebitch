@@ -121,6 +121,25 @@ class AudioDownloader:
         # Track last progress percentage to reduce spam
         self._last_progress_pct = -1
 
+    def _resolve_postprocessed_output_path(self, prepared_filename: str) -> Path:
+        prepared_path = Path(prepared_filename)
+        if prepared_path.suffix.lower() == ".mp3" and prepared_path.exists():
+            return prepared_path
+
+        mp3_path = prepared_path.with_suffix(".mp3")
+        if mp3_path.exists():
+            return mp3_path
+
+        if prepared_path.exists():
+            return prepared_path
+
+        output_dir = Path(self.config.output_directory)
+        alt_mp3_path = output_dir / mp3_path.name
+        if alt_mp3_path.exists():
+            return alt_mp3_path
+
+        return mp3_path
+
     def _yt_progress_hook(self, progress_dict):
         """yt-dlp progress hook for detailed logging without spamming."""
         status = progress_dict.get("status")
@@ -185,11 +204,11 @@ class AudioDownloader:
 
                 # Get the downloaded file path
                 filename = ydl.prepare_filename(info)
-                # yt-dlp may have changed the extension to .mp3
-                if filename.endswith(".webm") or filename.endswith(".m4a"):
-                    filename = Path(filename).with_suffix(".mp3")
-
-                output_file = Path(filename)
+                output_file = self._resolve_postprocessed_output_path(filename)
+                if not output_file.exists():
+                    raise FileNotFoundError(
+                        f"Output file not found after download: {output_file} (prepared: {filename})"
+                    )
 
                 # Apply metadata
                 self._apply_metadata(output_file, metadata)
@@ -277,11 +296,11 @@ class AudioDownloader:
 
                 # Get the downloaded file path
                 filename = ydl.prepare_filename(info)
-                # yt-dlp may have changed the extension to .mp3
-                if filename.endswith(".webm") or filename.endswith(".m4a"):
-                    filename = Path(filename).with_suffix(".mp3")
-
-                output_file = Path(filename)
+                output_file = self._resolve_postprocessed_output_path(filename)
+                if not output_file.exists():
+                    raise FileNotFoundError(
+                        f"Output file not found after download: {output_file} (prepared: {filename})"
+                    )
 
                 # Auto-detect metadata if empty
                 if metadata.is_empty():
@@ -349,10 +368,11 @@ class AudioDownloader:
             info = ydl.extract_info(video_url, download=True)
 
             filename = ydl.prepare_filename(info)
-            if filename.endswith(".webm") or filename.endswith(".m4a"):
-                filename = Path(filename).with_suffix(".mp3")
-
-            output_file = Path(filename)
+            output_file = self._resolve_postprocessed_output_path(filename)
+            if not output_file.exists():
+                raise FileNotFoundError(
+                    f"Output file not found after download: {output_file} (prepared: {filename})"
+                )
 
             # Apply metadata
             if metadata.is_empty():
